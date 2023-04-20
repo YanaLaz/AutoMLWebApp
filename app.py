@@ -1,7 +1,8 @@
-#Core packages
+# Core packages
 import streamlit as st
+import streamlit_authenticator as stauth
 
-#EDA packages (Exploratory data analysis)
+# EDA packages (Exploratory data analysis)
 import pandas as pd
 import os
 import numpy as np
@@ -9,6 +10,7 @@ import numpy as np
 # Data vizualisation packges
 import matplotlib.pyplot as plt
 import matplotlib
+
 matplotlib.use('Agg')
 import seaborn as sns
 
@@ -17,33 +19,52 @@ import pandas_profiling
 from streamlit_pandas_profiling import st_profile_report
 
 # ML
-from pycaret.classification import setup, compare_models, pull, save_model
+from pycaret.classification import setup as setup_cl, compare_models as compare_models_cl, pull as pull_cl, \
+    save_model as save_model_cl
+from pycaret.regression import setup as setup_rg, compare_models as compare_models_rg, pull as pull_rg, \
+    save_model as save_model_rg
+from pycaret.clustering import setup as setup_clust, create_model, pull as pull_clust, save_model as save_model_clust, \
+    assign_model
+
 from sklearn import model_selection
+import joblib
+import pickle
+
+# Database
+import database as db
 
 
 def main():
     """AutoMl App"""
     # st.title("AutoMl App")
 
-
     with st.sidebar:
+        st.title(f"Welcome, {name}!")
+
         st.image("https://www.clearrisk.com/hubfs/data%20analytics%20challenges.jpg")
         st.title("AutoStreamML")
-        choice = st.radio("Navigation", ["Upload", "Profiling", "Plot", "ML", "Download"])
-        st.info("This application allows you to build an automated ML pipeline using Streamlit, Pandas profiling and PyCaret!")
+        choice = st.radio("Navigation", ["Upload", "Profiling", "Plot", "ML", "Download", "Prediction"])
+        st.info(
+            "This application allows you to build an automated ML pipeline!")
+
+        authentificator.logout("Logout", 'sidebar')
 
     if os.path.exists("sourcedata.csv"):
         df = pd.read_csv('sourcedata.csv', index_col=None)
 
 
-
     if choice == "Upload":
-        st.title('Upload your data for modelling',)
-        file = st.file_uploader("Upload your dataset", type=['csv','txt','xls'])
+        st.title('Upload your data for modelling', )
+        file = st.file_uploader("Upload your dataset", type=['csv', 'txt', 'xls', 'xlsx'])
         if file:
             df = pd.read_csv(file, index_col=None)
             df.to_csv("sourcedata.csv", index=None)
             st.dataframe(df)
+            if os.path.exists("best_model.pkl"):
+                os.remove("best_model.pkl")
+            if os.path.exists("best_model_kmeans.pkl"):
+                os.remove("best_model_kmeans.pkl")
+
 
     if choice == "Profiling":
         st.title('Automated exploring data analysis')
@@ -65,11 +86,11 @@ def main():
             st.pyplot()
 
         all_columns = df.columns.to_list()
-        type_of_plot = st.selectbox('Select type of the plot', ["area","bar",'line','hist','box','kde'])
+        type_of_plot = st.selectbox('Select type of the plot', ["area", "bar", 'line', 'hist', 'box', 'kde'])
         selected_columns_names = st.multiselect('Select columns to plot', all_columns)
 
         if st.button('Generate plot'):
-            st.success('Generating customizable plot of {} for {}'.format(type_of_plot,selected_columns_names))
+            st.success('Generating customizable plot of {} for {}'.format(type_of_plot, selected_columns_names))
 
             # Plot by Streamlit
             if type_of_plot == "area":
@@ -91,38 +112,144 @@ def main():
     if choice == "ML":
         st.title('Builing ML Model')
         target = st.selectbox('Select your target', df.columns)
-        st.title('Builing ML Model')
         model = st.selectbox('Select your model', ['Classification', 'Regression', 'Clustering'])
         if st.button("Train model"):
-            setup(df, target = target, silent = True)
-            setup_df = pull()
-            st.info("This is the ML settings")
-            st.dataframe(setup_df)
-            best_model = compare_models()
-            compare_df = pull()
-            st.info('This is the ML Model:')
-            st.dataframe(compare_df)
-            best_model
-            save_model(best_model, 'best_model')
+            if model == 'Classification':
+                setup_cl(df, target=target, silent=True)
+                setup_df = pull_cl()
+                st.info("This is the ML settings")
+                st.dataframe(setup_df)
+                best_model = compare_models_cl()
+                compare_df = pull_cl()
+                st.info('This is the ML Model:')
+                st.dataframe(compare_df)
+                best_model
+                save_model_cl(best_model, 'best_model')
+            elif model == 'Regression':
+                setup_rg(df, target=target, silent=True)
+                setup_df_rg = pull_rg()
+                st.info("This is the ML settings")
+                st.dataframe(setup_df_rg)
+                best_model = compare_models_rg()
+                compare_df_rg = pull_rg()
+                st.info('This is the ML Model:')
+                st.dataframe(compare_df_rg)
+                best_model
+                save_model_rg(best_model, 'best_model')
+            elif model == 'Clustering':
+                setup_clust(df, silent=True)
+                setup_df = pull_clust()
+                st.info("This is the ML settings")
+                st.dataframe(setup_df)
+                kmeans = create_model('kmeans')
 
-        # Model building
-        X = df.iloc[:,0:-1]
-        Y = df.iloc[:,-1]
-        seed = 7
+                compare_df = pull_clust()
+                st.info('This is the Model - Kmeans:')
+                st.dataframe(compare_df)
 
-        # Model
-        models = []
-
-
+                result = assign_model(kmeans)
+                st.info('Assigned clusters')
+                st.dataframe(result)
+                # best_model
+                save_model_clust(kmeans, 'best_model_kmeans')
 
     if choice == "Download":
-        with open ('best_model.pkl', 'rb') as f:
-            st.download_button('Download the Model', f, "trained_model.pkl")
+        st.title('Download the pkl file')
+        with open('best_model.pkl', 'rb') as f:
+            st.download_button('Download', f, "trained_model.pkl")
+
+    if choice == "Prediction":
+        st.title('Prediction for your values')
+
+        if os.path.exists("best_model.pkl"):
+            model = joblib.load('best_model.pkl')
+            if st.checkbox('Enter values for one prediction'):
+
+                target = st.selectbox('Select your target', df.columns)
+
+                prediction_values = {}
+                for namee in df.columns:
+                    if namee != target:
+                        prediction_values[namee] = st.text_input(namee)
+
+                if st.button("Make prediction"):
+
+                    # Use the pre-trained model to make a prediction
+                    input_df = pd.DataFrame([list(prediction_values.values())], columns=list(prediction_values.keys()))
+                    prediction = model.predict(input_df)
+
+                    target_values = df[target].unique()
+                    if all(str(ele).isdigit() for ele in target_values):
+                        st.write('Prediction:', prediction[0])
+                    else:
+                        label_map = {code: name for code, name in enumerate(target_values)}
+                        # st.write(label_map)
+                        predicted_label = label_map[prediction[0]]
+                        st.write('Prediction:', predicted_label)
+
+            if st.checkbox('Upload a dataset for prediction'):
+                file = st.file_uploader("Upload your dataset for prediction", type=['csv', 'txt', 'xls', 'xlsx'])
+                if file:
+                    input_df = pd.read_csv(file, index_col=None)
+                    predictions = model.predict(input_df)
+                    input_df['predictions'] = predictions
+                    # target_values = df[target].unique()
+
+                    st.write('Predictions:')
+                    st.write(input_df)
+
+                    # if all(str(ele).isdigit() for ele in target_values):
+                    #     st.write('Prediction:', prediction[0])
+                    # else:
+                    #     label_map = {code: name for code, name in enumerate(target_values)}
+                    #     # st.write(label_map)
+                    #     predicted_label = label_map[prediction[0]]
+                    #     st.write('Prediction:', predicted_label)
+        else:
+            st.write('Firstly, go to the ML page and train the models for classification or regression task')
 
 
-if __name__ == '__main__':
-    main()
+if __name__:
+
+    # -------- USER AUTHENTICATION --------
 
 
+    # Show the login or sign up form based on the user's selection
+    form_selection = st.sidebar.radio("Select an option", ["Login", "Sign Up"])
+    if form_selection == "Login":
+        users = db.fetch_all_users()
 
+        usernames = [user['key'] for user in users]
+        names = [user['name'] for user in users]
+        hashed_passwords = [user['password'] for user in users]
 
+        authentificator = stauth.Authenticate(names, usernames, hashed_passwords, 'autoMlapp', 'abcdef',
+                                              cookie_expiry_days=30)
+
+        name, authentication_status, username = authentificator.login("Login", "main")
+
+        if authentication_status == False:
+            print("Username/password is incorrect")
+            st.error("Username/password is incorrect")
+
+        if authentication_status == None:
+            st.warning("Please enter your username and password")
+
+        if authentication_status == True:
+            print('User found! Successfully logged in')
+            st.sidebar.empty()
+            main()
+
+    elif form_selection == "Sign Up":
+        db.delete_user('yanix')
+        db.insert_user('yanix', 'Yana', 'qwerty')
+        st.subheader("Create a new account")
+
+        new_username = st.text_input("Username")
+        new_name = st.text_input("Name")
+        new_password = st.text_input("Password", type="password")
+
+        if st.button("Submit"):
+            db.insert_user(new_username, new_name, new_password)
+            print("User created!")
+            st.success("User created!")
