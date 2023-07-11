@@ -1,7 +1,7 @@
 # Core packages
-import ydata_profiling
 import streamlit as st
 import streamlit_authenticator as stauth
+import ydata_profiling
 
 # EDA packages (Exploratory data analysis)
 import pandas as pd
