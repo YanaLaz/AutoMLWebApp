@@ -1,5 +1,5 @@
 # Core packages
-import pandas_profiling
+import ydata_profiling
 import streamlit as st
 import streamlit_authenticator as stauth
 
@@ -7,7 +7,7 @@ import streamlit_authenticator as stauth
 import pandas as pd
 import os
 
-# Data vizualisation packges
+# Data visualisation packages
 import matplotlib
 
 matplotlib.use('Agg')
@@ -70,7 +70,7 @@ def main():
     if choice == "Profiling":
         st.title('Automated exploring data analysis')
         # profile_report = df.profile_report()
-        profile_report = pandas_profiling.ProfileReport(df)
+        profile_report = ydata_profiling.ProfileReport(df)
         st_profile_report(profile_report)
 
     if choice == "Plot":
