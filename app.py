@@ -1,21 +1,19 @@
 # Core packages
+import pandas_profiling
 import streamlit as st
 import streamlit_authenticator as stauth
 
 # EDA packages (Exploratory data analysis)
 import pandas as pd
 import os
-import numpy as np
 
 # Data vizualisation packges
-import matplotlib.pyplot as plt
 import matplotlib
 
 matplotlib.use('Agg')
 import seaborn as sns
 
 # import profiling capability
-import pandas_profiling
 from streamlit_pandas_profiling import st_profile_report
 
 # ML
@@ -26,9 +24,7 @@ from pycaret.regression import setup as setup_rg, compare_models as compare_mode
 from pycaret.clustering import setup as setup_clust, create_model, pull as pull_clust, save_model as save_model_clust, \
     assign_model
 
-from sklearn import model_selection
 import joblib
-import pickle
 
 # Database
 import database as db
@@ -54,12 +50,17 @@ def main():
 
 
     if choice == "Upload":
-        st.title('Upload your data for modelling', )
+        st.title('Upload your data for modelling')
         file = st.file_uploader("Upload your dataset", type=['csv', 'txt', 'xls', 'xlsx'])
         if file:
             df = pd.read_csv(file, index_col=None)
             df.to_csv("sourcedata.csv", index=None)
             st.dataframe(df)
+
+            filename = file.name
+
+            db.upload_file(username, df, filename)
+
             if os.path.exists("best_model.pkl"):
                 os.remove("best_model.pkl")
             if os.path.exists("best_model_kmeans.pkl"):
@@ -68,7 +69,8 @@ def main():
 
     if choice == "Profiling":
         st.title('Automated exploring data analysis')
-        profile_report = df.profile_report()
+        # profile_report = df.profile_report()
+        profile_report = pandas_profiling.ProfileReport(df)
         st_profile_report(profile_report)
 
     if choice == "Plot":
@@ -110,12 +112,13 @@ def main():
                 st.pyplot()
 
     if choice == "ML":
-        st.title('Builing ML Model')
+        st.title('Building ML Model')
         target = st.selectbox('Select your target', df.columns)
         model = st.selectbox('Select your model', ['Classification', 'Regression', 'Clustering'])
+        train_size = st.slider('Select the percentage of the dataset to use for training', 0, 100, 80)
         if st.button("Train model"):
             if model == 'Classification':
-                setup_cl(df, target=target, silent=True)
+                setup_cl(df, target=target, train_size=train_size/100, silent=True)
                 setup_df = pull_cl()
                 st.info("This is the ML settings")
                 st.dataframe(setup_df)
@@ -126,7 +129,7 @@ def main():
                 best_model
                 save_model_cl(best_model, 'best_model')
             elif model == 'Regression':
-                setup_rg(df, target=target, silent=True)
+                setup_rg(df, target=target, train_size=train_size/100, silent=True)
                 setup_df_rg = pull_rg()
                 st.info("This is the ML settings")
                 st.dataframe(setup_df_rg)
@@ -183,7 +186,6 @@ def main():
                         st.write('Prediction:', prediction[0])
                     else:
                         label_map = {code: name for code, name in enumerate(target_values)}
-                        # st.write(label_map)
                         predicted_label = label_map[prediction[0]]
                         st.write('Prediction:', predicted_label)
 
@@ -193,18 +195,10 @@ def main():
                     input_df = pd.read_csv(file, index_col=None)
                     predictions = model.predict(input_df)
                     input_df['predictions'] = predictions
-                    # target_values = df[target].unique()
 
                     st.write('Predictions:')
                     st.write(input_df)
 
-                    # if all(str(ele).isdigit() for ele in target_values):
-                    #     st.write('Prediction:', prediction[0])
-                    # else:
-                    #     label_map = {code: name for code, name in enumerate(target_values)}
-                    #     # st.write(label_map)
-                    #     predicted_label = label_map[prediction[0]]
-                    #     st.write('Prediction:', predicted_label)
         else:
             st.write('Firstly, go to the ML page and train the models for classification or regression task')
 
@@ -237,7 +231,7 @@ if __name__:
 
         if authentication_status == True:
             print('User found! Successfully logged in')
-            st.sidebar.empty()
+            del form_selection
             main()
 
     elif form_selection == "Sign Up":
@@ -252,4 +246,5 @@ if __name__:
         if st.button("Submit"):
             db.insert_user(new_username, new_name, new_password)
             print("User created!")
+            st.balloons()
             st.success("User created!")
