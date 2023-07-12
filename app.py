@@ -217,26 +217,28 @@ if __name__:
         names = [user['name'] for user in users]
         hashed_passwords = [user['password'] for user in users]
 
-        authentificator = stauth.Authenticate(names, usernames, hashed_passwords, 'autoMlapp', 'abcdef',
-                                              cookie_expiry_days=30)
+        credentials = {"usernames": {}}
+
+        for uname, name, pwd in zip(usernames, names, hashed_passwords):
+            user_dict = {"name": name, "password": pwd}
+            credentials["usernames"].update({uname: user_dict})
+
+        authentificator = stauth.Authenticate(credentials, 'autoMlapp', 'abcdef', cookie_expiry_days=30)
 
         name, authentication_status, username = authentificator.login("Login", "main")
 
         if authentication_status == False:
-            print("Username/password is incorrect")
             st.error("Username/password is incorrect")
 
         if authentication_status == None:
             st.warning("Please enter your username and password")
 
         if authentication_status == True:
-            print('User found! Successfully logged in')
             del form_selection
+            st.balloons()
             main()
 
     elif form_selection == "Sign Up":
-        db.delete_user('yanix')
-        db.insert_user('yanix', 'Yana', 'qwerty')
         st.subheader("Create a new account")
 
         new_username = st.text_input("Username")
@@ -245,6 +247,5 @@ if __name__:
 
         if st.button("Submit"):
             db.insert_user(new_username, new_name, new_password)
-            print("User created!")
             st.balloons()
             st.success("User created!")
