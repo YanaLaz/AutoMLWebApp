@@ -25,6 +25,7 @@ from pycaret.clustering import setup as setup_clust, create_model, pull as pull_
     assign_model
 
 import joblib
+import random
 
 # Database
 import database as db
@@ -32,7 +33,6 @@ import database as db
 
 def main():
     """AutoMl App"""
-    # st.title("AutoMl App")
 
     with st.sidebar:
         st.title(f"Welcome, {name}!")
@@ -65,11 +65,25 @@ def main():
                 os.remove("best_model.pkl")
             if os.path.exists("best_model_kmeans.pkl"):
                 os.remove("best_model_kmeans.pkl")
+        if st.button('Upload random dataset'):
+            dataset_folder = 'datasets'
+            datasets = os.listdir(dataset_folder)
 
+            random_dataset = random.choice(datasets)
+            dataset_path = os.path.join(dataset_folder, random_dataset)
+
+            df = pd.read_csv(dataset_path)
+            st.text(os.path.basename(dataset_path))
+            df.to_csv("sourcedata.csv", index=None)
+            st.dataframe(df)
+
+            if os.path.exists("best_model.pkl"):
+                os.remove("best_model.pkl")
+            if os.path.exists("best_model_kmeans.pkl"):
+                os.remove("best_model_kmeans.pkl")
 
     if choice == "Profiling":
         st.title('Automated exploring data analysis')
-        # profile_report = df.profile_report()
         profile_report = ydata_profiling.ProfileReport(df)
         st_profile_report(profile_report)
 
@@ -118,7 +132,7 @@ def main():
         train_size = st.slider('Select the percentage of the dataset to use for training', 0, 100, 80)
         if st.button("Train model"):
             if model == 'Classification':
-                setup_cl(df, target=target, train_size=train_size/100, silent=True)
+                setup_cl(df, target=target, train_size=train_size/100)
                 setup_df = pull_cl()
                 st.info("This is the ML settings")
                 st.dataframe(setup_df)
@@ -129,7 +143,7 @@ def main():
                 best_model
                 save_model_cl(best_model, 'best_model')
             elif model == 'Regression':
-                setup_rg(df, target=target, train_size=train_size/100, silent=True)
+                setup_rg(df, target=target, train_size=train_size/100)
                 setup_df_rg = pull_rg()
                 st.info("This is the ML settings")
                 st.dataframe(setup_df_rg)
@@ -140,7 +154,7 @@ def main():
                 best_model
                 save_model_rg(best_model, 'best_model')
             elif model == 'Clustering':
-                setup_clust(df, silent=True)
+                setup_clust(df)
                 setup_df = pull_clust()
                 st.info("This is the ML settings")
                 st.dataframe(setup_df)
@@ -207,7 +221,6 @@ if __name__:
 
     # -------- USER AUTHENTICATION --------
 
-
     # Show the login or sign up form based on the user's selection
     form_selection = st.sidebar.radio("Select an option", ["Login", "Sign Up"])
     if form_selection == "Login":
@@ -232,10 +245,10 @@ if __name__:
 
         if authentication_status == None:
             st.warning("Please enter your username and password")
+            st.info("For guest account use - \nusername: guest, password: guest")
 
         if authentication_status == True:
             del form_selection
-            st.balloons()
             main()
 
     elif form_selection == "Sign Up":
